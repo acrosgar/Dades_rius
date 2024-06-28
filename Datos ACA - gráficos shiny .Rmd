@@ -1,0 +1,508 @@
+---
+title: "Datos ACA"
+author: "Anna Cros, Adrià Rubirola, María Soria"
+date: "2024-06-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Importacion de datos del ACA a través de GitHub
+Repositorio de GitHub: https://github.com/acrosgar/Dades_rius
+Importación de dataframes divididos en tres, debido a restricciones de tamaño tanto de los datos originales del ACA como de GitHub, y posterior unión con rbind.
+
+```{r cars}
+#Dades Quantitat Llobregat
+Llob_Q_1 <- read.csv2("https://raw.githubusercontent.com/acrosgar/Dades_rius/main/Llobregat/dadesllobcant1.csv")
+Llob_Q_2 <- read.csv2("https://raw.githubusercontent.com/acrosgar/Dades_rius/main/Llobregat/dadesllobcant3-1.csv") 
+Llob_Q_3 <- read.csv2("https://raw.githubusercontent.com/acrosgar/Dades_rius/main/Llobregat/dadesllobcant3-2.csv")
+Llob_Q_raw <- rbind(Llob_Q_1, Llob_Q_2, Llob_Q_3)
+
+
+```
+
+
+```{r}
+#Dades FisicoQuímiques Llobregat
+Llob_FQ_1 <- read.csv2("https://raw.githubusercontent.com/acrosgar/Dades_rius/main/Llobregat/dadesLlobfq1.csv")
+Llob_FQ_2 <- read.csv2("https://raw.githubusercontent.com/acrosgar/Dades_rius/main/Llobregat/dadesLlobfq2.csv")
+Llob_FQ_3 <- read.csv2("https://raw.githubusercontent.com/acrosgar/Dades_rius/main/Llobregat/Llob_fq3.csv")
+Llob_FQ_raw <- rbind(Llob_FQ_1, Llob_FQ_2, Llob_FQ_3)
+
+```
+
+## Comprobar que se han importado y unido correctamente las columnas:
+```{r}
+head(Llob_FQ_raw) 
+head(Llob_Q_raw) 
+
+
+names(Llob_FQ_raw)
+names(Llob_Q_raw)
+```
+
+#Data wrangling
+```{r}
+if (!require(dplyr)) install.packages("dplyr")
+if (!require(lubridate)) install.packages("lubridate")
+if (!require(tidyr)) install.packages("tidyr")
+if (!require(stringr)) install.packages("stringr")
+
+
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(lubridate)
+```
+
+##Datos Fisiocoquímicos:
+
+
+```{r}
+#Eliminar filas de variables no deseadas FQs
+    # Define the value to remove
+    values_to_remove <- c("Bicarbonats","Bromurs", "Cianurs", "Cianurs lliures", "Conductivitat (camp)","Calci","Carbonats", "Detergents aniònics","Detergents Aniònics", "Detergentes Aniònics", "Fluorurs",  "Duresa total", "Error relatiu balanç iònic", "Magnesi", "Suma d\'anions", "Suma de cations", "pH", "Amoníac no ionitzat", "Clor residual total")
+
+    # Filter out rows containing the value
+    Llob_FQ_clean <- Llob_FQ_raw %>%
+      filter(!apply(Llob_FQ_raw, 1, function(row) any(row %in% values_to_remove)))
+
+
+#Eliminar columnas en FQ
+    Llob_FQ_clean <- Llob_FQ_clean[, !(names(Llob_FQ_clean) %in% c("Profunditat.mostra..m.", "Codi.Estació"))]
+
+
+#Unir columna Variable con la columna de unidad de medida
+  Llob_FQ_clean <- Llob_FQ_clean %>%
+  unite("Variable", Variable, Unitat.Mesura, sep = " - ")
+
+  #comprobar columnas
+    names(Llob_FQ_clean)
+
+#Tranformar variables 'character' en columna Valor en variables numéricas
+Llob_FQ_clean$Valor <- as.numeric(Llob_FQ_clean$Valor)
+
+
+#Transformar datos de columnas "Codi massa d'aigua", "Masa d'aigua", "UTM X", "UTM Y" y "Variable" en factores
+    # Convertir varias columnas a factores
+    Llob_FQ_clean <- Llob_FQ_clean %>%
+      mutate(across(c('Data','Codi.massa.d.aigua','Massa.d.aigua','UTM.X','UTM.Y','Variable'), as.factor))
+
+    #mostrar una lista de las variables 
+      levels(Llob_FQ_clean$Variable)
+
+#Formato de columna 'Data' en fecha
+Llob_FQ_clean$Data <- as.Date(Llob_FQ_clean$Data, format = "%Y/%m/%d")
+
+#revisar valores NA
+colSums(is.na(Llob_FQ_clean)) #da una lista de las columnas con el numero de NA, en todas es cero
+
+
+ # Verificar los cambios
+    str(Llob_FQ_clean)
+    head(Llob_FQ_clean)
+```
+
+##Datos de Caudal
+
+La columna "unitat de mesura" parece ser constante a lo largo de todo el dataframe, por lo que, tras comprobarlo, se une con la de Variable para eliminar columnas innecesarias.
+```{r}
+###
+#comprobar que es constante
+#is_constant_column_mesura <- Llob_Q_clean %>%
+  #summarise(is_constant = n_distinct(Unitat.Mesura) == 1) %>%
+  #pull(is_constant)
+
+#print(is_constant_column_mesura) 
+    #esto da TRUE
+
+#Unir Variable con unidad de medida
+Llob_Q_raw1 <- Llob_Q_raw %>%
+  unite("Variable", Variable, Unitat.Mesura, sep = " - ")
+###
+
+```
+Acabar de modificar los datos del caudal, igual que  los fisicoquímicos
+```{r}
+#Eliminar columna Conca en Q
+  Llob_Q_clean <- Llob_Q_raw1[, !(names(Llob_Q_raw1) %in% c("Conca"))]
+
+#Eliminar niveles en Q
+    # Define the word to remove
+    word_to_remove <- "Nivell"
+
+    # Filter out rows containing the word
+    Llob_Q_clean<- Llob_Q_clean %>%
+      filter(!apply(Llob_Q_clean, 1, function(row) any(str_detect(row, word_to_remove))))
+
+
+#Tranformar variables tipo 'character' en columna Mitjana en variables numéricas
+Llob_Q_clean$Mitjana <- as.numeric(Llob_Q_clean$Mitjana)
+
+#Transformar datos de columnas "Data", "Estació", "UTM X", "UTM Y" y "Variable" en factores
+
+    # Convertir varias columnas a factores
+    Llob_Q_clean <- Llob_Q_clean %>%
+      mutate(across(c('Data','Estació',,'UTM.X','UTM.Y','Variable'), as.factor))
+
+#Pasar columna de Data al formato fecha
+Llob_Q_clean$Data <- as.Date(Llob_Q_clean$Data, format = "%Y/%m/%d")
+
+#revisar valores NA
+colSums(is.na(Llob_Q_clean)) #da una lista de las columnas con el número de NA
+#Comprobar
+   str(Llob_Q_clean)
+   head(Llob_Q_clean)
+```
+
+
+Comprobar si coinciden las ubicaciones de los datos fisicoquímicos y de caudal según las coordenadas UTM *no coinciden, OPCIONAL
+
+```{r}
+# Combinar columnas A y B en df1
+Llob_FQ_clean_ubi <- Llob_FQ_clean %>%
+  mutate(coordenades_UTM = paste(UTM.X, UTM.Y, sep = "_"))
+
+# Combinar columnas C y D en df2
+Llob_Q_clean_ubi <- Llob_Q_clean %>%
+  mutate(coordenades_UTM = paste(UTM.X, UTM.Y, sep = "_"))
+
+# Comparar las combinaciones y encontrar coincidencias
+matches <- intersect(Llob_FQ_clean_ubi$coordenades_UTM, Llob_Q_clean_ubi$coordenades_UTM)
+
+head(Llob_FQ_clean_ubi)
+head(Llob_Q_clean_ubi)
+print(matches)  #no da ningún match (raro?) - he comprobado que ambos dataframes son del llobregat, así que toca enviar correo al ACA
+
+#eliminar la nueva columna si no hace falta ya
+Llob_FQ_clean_3 <- Llob_FQ_clean_ubi %>%
+  select(-coordenades_UTM)
+Llob_Q_clean_3 <- Llob_Q_clean_ubi %>%
+  select(-coordenades_UTM)
+
+```
+
+#ANÁLISIS EXPLORATORIO DE DATOS
+```{r}
+if (!require(lubridate)) install.packages("skimr")
+library(skimr)
+```
+
+
+Resumen estadístico de los datos según las diferentes variables
+```{r}
+#de los datos físicoquímicos
+ Llob_FQ_clean %>%
+  group_by(Variable) %>%
+  skim()
+
+#de los datos de caudal
+ Llob_Q_clean %>%
+  group_by(Estació) %>%
+  skim()
+
+
+
+```
+
+Agrupar según año, estación y factor y obtener el valor medio de las observaciones
+```{r}
+#Datos fisicoquímicos
+Llob_FQ_medias <- Llob_FQ_clean %>%
+  mutate(any_mes = floor_date(Data, "month")) %>%
+  group_by(Massa.d.aigua, any_mes, Variable,UTM.X, UTM.Y) %>%
+  summarise(media_valor = mean(Valor, na.rm = TRUE))
+
+
+#Datos de caudal
+Llob_Q_medias <- Llob_Q_clean %>%
+  mutate(any_mes = floor_date(Data, "month")) %>%
+  group_by(Estació, any_mes, Variable, UTM.X, UTM.Y) %>%
+  summarise(media_valor = mean(Mitjana, na.rm = TRUE))
+
+head(Llob_FQ_medias)
+head(Llob_Q_medias)
+```
+#Crear dataframe que los valores máximo, mínimo y media para valores FQ 
+````{r}
+
+
+# Calculate max, min, and mean for each variable
+Llob_FQ_summary <- Llob_FQ_clean %>%
+  mutate(any_mes = floor_date(Data, "month")) %>%
+  group_by(Massa.d.aigua, any_mes, Variable,UTM.X, UTM.Y) %>%
+  summarise(
+    max_value = max(Valor, na.rm = TRUE),
+    min_value = min(Valor, na.rm = TRUE),
+    mean_value = mean(Valor, na.rm = TRUE)
+  )
+
+# Combine with specific columns from original dataframe
+
+head(Llob_FQ_summary)
+
+#quitar las columnas de massa.d.aigua y codi.massa.daigua
+#Llob_FQ_sum_ubi2<- Llob_FQ_sum_ubi[, !(names(Llob_FQ_sum_ubi) %in% c("Massa.d.aigua", "Codi.massa.d.aigua"))]
+```
+
+
+##Shiny app gráficos
+
+```{r}
+if (!require(zoo)) install.packages("zoo")
+if (!require(ggplot2)) install.packages("ggplot2")
+if (!require(shiny)) install.packages("shiny")
+if (!require(scales)) install.packages("shiny")
+
+library(zoo)  
+library(shiny)
+library(ggplot2)
+library(scales)
+
+```
+
+#1. Dades fisicoquímiques
+##GRÁFICO SHINY  DE VARIABLES OVER TIME AND LOCATION - 
+
+En azul sale la media, en rojo la máxima y en verde la mínima. Máximos y mínimos tienen el color un poco más flojito para que destaque la media, aunque en los gráficos locales muchas veces se superponen los tres o hay picos extraños. Entiendo que es por NAs o que solo había una medida de esa variable ese mes. A veces no sale la media o salen maximo y mínimo invertidos. Estoy haciendo otro para ver si lo soluciono de otra forma. 
+````{r}
+
+#ordenar según estaciones #se puede cambiar según el mes en el que empiezan o el que acaban simplemente cambiando los números que corresponden a los meses de la clasificación
+Llob_FQ_shiny <- Llob_FQ_clean %>%
+ mutate(estacion = case_when(
+    month(Data) %in% c(12, 1, 2) ~ paste(year(Data) - if_else(month(Data) == 12, 0, 1), "Invierno"),
+    month(Data) %in% c(3, 4, 5) ~ paste(year(Data), "Primavera"),
+    month(Data) %in% c(6, 7, 8) ~ paste(year(Data), "Verano"),
+    month(Data) %in% c(9, 10, 11) ~ paste(year(Data), "Otoño")
+  ))
+
+#eliminar columnas de coordenadas
+Llob_FQ_shiny1 <- Llob_FQ_shiny %>%
+  ungroup() %>%
+  select(-UTM.X, -UTM.Y)
+
+
+`````
+
+````{r shinyapp}
+
+#Shinyapp
+# Define UI for the application
+ui <- fluidPage(
+  titlePanel("Interactive Plot of Mean Variables Over Time and Location"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("Variable", "Select Variable:", choices = unique(Llob_FQ_shiny1$Variable)),
+      selectInput("Massa.d.aigua", "Select Location:", choices = unique(Llob_FQ_shiny1$Massa.d.aigua))
+    ),
+    mainPanel(
+      plotOutput("meanPlot")
+    )
+  )
+)
+
+
+
+#define server
+server <- function(input, output) {
+  filteredData <- reactive({
+    Llob_FQ_shiny1 %>%
+      filter(Variable == input$Variable, Massa.d.aigua == input$Massa.d.aigua) %>%
+      mutate(estacion = case_when(
+        month(Data) %in% c(12, 1, 2) ~ paste(year(Data) - if_else(month(Data) == 12, 0, 1), "Invierno"),
+        month(Data) %in% c(3, 4, 5) ~ paste(year(Data), "Primavera"),
+        month(Data) %in% c(6, 7, 8) ~ paste(year(Data), "Verano"),
+        month(Data) %in% c(9, 10, 11) ~ paste(year(Data), "Otoño")
+      )) %>%
+      group_by(estacion, Variable, Massa.d.aigua) %>%
+      summarize(
+        mean_value = mean(Valor, na.rm = TRUE),
+        max_value = max(Valor, na.rm = TRUE),
+        min_value = min(Valor, na.rm = TRUE)
+      ) 
+  })
+  
+  output$meanPlot <- renderPlot({
+    data <- filteredData()
+    
+      ggplot(data, aes(x = estacion)) +
+        geom_line(aes(y = mean_value, color = "Media"), group = 1, na.rm = TRUE) +
+        geom_point(aes(y = mean_value, color = "Media"), na.rm = TRUE) +
+        geom_line(aes(y = max_value, color = "Max"), group = 1, na.rm = TRUE,linetype = "dashed", alpha = 0.7) +
+        geom_point(aes(y = max_value, color = "Max"), na.rm = TRUE, linetype = "dashed", alpha = 0.7) +
+        geom_line(aes(y = min_value, color = "Min"), group = 1, na.rm = TRUE,linetype = "dashed", alpha = 0.7) +
+        geom_point(aes(y = min_value, color = "Min"), na.rm = TRUE,linetype = "dashed", alpha = 0.7) +
+        labs(title = paste("Valores para", input$Variable, "en", input$Massa.d.aigua),
+            y = "Valores",
+            color = "Valor") +
+        scale_color_manual(values = c("Max" = "orangered", "Min" = "green4", "Media" = "blue")) +
+        theme_minimal() +
+##transformación logarítmica del eje Y para cuando se escapa el máximo. Si se observan valores en lo es que no es necesario se puede anular con # las siguientes dos líneas
+        scale_y_log10() +  # Transformación logarítmica en el eje Y 
+      annotation_logticks(sides = "l") +
+        #
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        theme(panel.background = element_rect(fill = "white"))
+      
+    
+  })
+}
+# Run the application
+shinyApp(ui = ui, server = server)
+```
+
+
+##GRÁFICO SHINY OVER TIME (sin localización)
+````{r shinyapp}
+
+#Obtener medias en función de localización y variable
+
+Llob_FQ_shiny2 <- Llob_FQ_shiny1 %>%
+  group_by(Variable, Massa.d.aigua) 
+
+
+# Define UI for the application
+
+
+ui <- fluidPage(
+  titlePanel("Progresión de las variables fiscoquímicas a lo largo del tiempo"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("Variable", "Select Variable:", choices = unique(Llob_FQ_shiny2$Variable))
+    ),
+    mainPanel(
+      plotOutput("meanPlot")
+    )
+  )
+)
+
+# Define server logic
+server <- function(input, output) {
+  filteredData <- reactive({
+    print(paste("Selected Variable:", input$Variable))
+    
+    # Filter the data based on selected variable
+    filtered <- Llob_FQ_shiny2 %>%
+      filter(Variable == input$Variable) %>%
+      group_by(estacion) %>%
+      summarize(
+        mean_value = mean(Valor, na.rm = TRUE),
+        max_value = max(Valor, na.rm = TRUE),
+        min_value = min(Valor, na.rm = TRUE)
+      )
+  
+  })
+  
+  output$meanPlot <- renderPlot({
+    data <- filteredData()
+    print("Aggregated Data:")
+    print(data)
+    
+      ggplot(data, aes(x = estacion)) +
+        geom_line(aes(y = mean_value, color = "Media"), group = 1, na.rm = TRUE) +
+        geom_point(aes(y = mean_value, color = "Media"), na.rm = TRUE) +
+        geom_line(aes(y = max_value, color = "Max"), group = 1, na.rm = TRUE,linetype = "dashed", alpha = 0.7) +
+        geom_point(aes(y = max_value, color = "Max"), na.rm = TRUE, linetype = "dashed", alpha = 0.7) +
+        geom_line(aes(y = min_value, color = "Min"), group = 1, na.rm = TRUE,linetype = "dashed", alpha = 0.7) +
+        geom_point(aes(y = min_value, color = "Min"), na.rm = TRUE,linetype = "dashed", alpha = 0.7) +
+        labs(title = paste("Valores para", input$Variable, "en", input$Massa.d.aigua),
+            y = "Valores",
+            color = "Valor") +
+        scale_color_manual(values = c("Max" = "orangered", "Min" = "green4", "Media" = "blue")) +
+        theme_minimal() +
+##transformación logarítmica del eje Y para cuando se escapa el máximo. Si se observan valores en lo es que no es necesario se puede anular con # las siguientes dos líneas
+        scale_y_log10() +  # Transformación logarítmica en el eje Y 
+      annotation_logticks(sides = "l") +
+        #
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        theme(panel.background = element_rect(fill = "white"))
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
+
+``
+
+```
+
+#Gráfico Shiny para datos de Cabal
+```{r shinyapp}
+#separar en estaciones
+
+Llob_Q_shiny <- Llob_Q_clean %>%
+ mutate(estacion = case_when(
+    month(Data) %in% c(12, 1, 2) ~ paste(year(Data) - if_else(month(Data) == 12, 0, 1), "Invierno"),
+    month(Data) %in% c(3, 4, 5) ~ paste(year(Data), "Primavera"),
+    month(Data) %in% c(6, 7, 8) ~ paste(year(Data), "Verano"),
+    month(Data) %in% c(9, 10, 11) ~ paste(year(Data), "Otoño")
+  ))
+    
+    
+Llob_Q_shiny1 <- Llob_Q_shiny %>%
+  ungroup() %>%
+  select(-UTM.X, -UTM.Y, -Estació)
+Llob_Q_shiny1 <- Llob_Q_shiny %>%
+  ungroup() %>%
+  select(-UTM.X, -UTM.Y, -Estació)
+
+#Shinyapp
+# Define UI for the application
+ui <- fluidPage(
+  titlePanel("Interactive Plot of Mean Variable Over Time"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("Variable", "Select Variable:", choices = unique(Llob_Q_shiny1$Variable)),
+    ),
+    mainPanel(
+      plotOutput("meanPlot")
+    )
+  )
+)
+
+
+
+#define server
+server <- function(input, output) {
+  filteredData <- reactive({
+    Llob_Q_shiny1 %>%
+      filter(Variable == input$Variable) %>%
+      group_by(estacion) %>%
+      summarize(
+        mean_value = mean(Mitjana, na.rm = TRUE),
+        max_value = max(Mitjana, na.rm = TRUE),
+        min_value = min(Mitjana, na.rm = TRUE)
+      ) 
+  })
+  
+  output$meanPlot <- renderPlot({
+    data <- filteredData()
+    
+    ggplot(data, aes(x = estacion)) +
+        geom_line(aes(y = mean_value, color = "Media"), group = 1, na.rm = TRUE) +
+        geom_point(aes(y = mean_value, color = "Media"), na.rm = TRUE) +
+        geom_line(aes(y = max_value, color = "Max"), group = 1, na.rm = TRUE,linetype = "dashed", alpha = 0.7) +
+        geom_point(aes(y = max_value, color = "Max"), na.rm = TRUE, linetype = "dashed", alpha = 0.7) +
+        geom_line(aes(y = min_value, color = "Min"), group = 1, na.rm = TRUE,linetype = "dashed", alpha = 0.7) +
+        geom_point(aes(y = min_value, color = "Min"), na.rm = TRUE,linetype = "dashed", alpha = 0.7) +
+        labs(title = paste("Valores para", input$Variable, "en", input$Massa.d.aigua),
+            y = "Valores",
+            color = "Valor") +
+        scale_color_manual(values = c("Max" = "orangered", "Min" = "green4", "Media" = "blue")) +
+     theme_minimal() +
+
+##transformación logarítmica del eje Y para cuando se escapa el máximo. Si se observan valores en lo es que no es necesario se puede anular con # las siguientes dos líneas
+        scale_y_log10() +  # Transformación logarítmica en el eje Y 
+      annotation_logticks(sides = "l") +
+        #
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        theme(panel.background = element_rect(fill = "white"))
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
+````
+#plot de la media del cabal total de todas las estaciones 
