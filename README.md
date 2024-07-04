@@ -1,3 +1,5 @@
-Los archivos csv de datos de los ríos están divididos según el río y las variables observadas. Son datos públicos obtenidos de la web del ACA. 
-Están en varios archivos cada uno ya que en la web del ACA se obtienen los datos en varios archivos de Excel (de 2 a 3 archivos según el río9. 
-Cada archivo contiene una hoja para cada estudio, convertidas en csv
+Los datos se han obtenido de la web de la Agencia Catalana del Agua y corresponden a variables fisiocquímicas y de caudal de la cuenca del río Llobregat.
+El script Rmarkdown contiene la importación de los csv desde este repositorio, de manera que no hace falta descargarlos localmente. 
+Dentro del script se encuentra tanto el data Wrangling como la posterior visualización de los datos en gráficos interactivos shiny y análisis de componentes, entre otros. También contiene modelos de predicción para dos variables.
+
+Todo esto se ha utilizado para realizar el trabajo final del curso de posgrado "Ciencia de los Datos (Data Science), Aplicaciones en Biología y Medicina con Python y R" de la Universidad de Barcelona
